@@ -1,31 +1,44 @@
+// backend/index.js
+const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, ".env") });
+
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
-const dotenv = require("dotenv");
-// const bodyParser = require("body-parser")
+const serverless = require("serverless-http");
+
 const app = express();
-const Routes = require("./routes/route.js");
+app.use(express.json());
+app.use(cors({ origin: true, credentials: true }));
 
-const PORT = process.env.PORT || 5000;
+app.get("/health", (_req, res) => res.status(200).send("OK"));
 
-dotenv.config();
-
-// app.use(bodyParser.json({ limit: '10mb', extended: true }))
-// app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }))
-
-app.use(express.json({ limit: "10mb" }));
-app.use(cors());
-
-mongoose
-  .connect(process.env.MONGO_URL, {
+// ensure DB connection is reused across invocations
+let conn = null;
+async function connectDB() {
+  if (conn && mongoose.connection.readyState === 1) return;
+  const MONGO_URL = process.env.MONGO_URL || process.env.MONGO_URI;
+  if (!MONGO_URL) throw new Error("MONGO_URL missing");
+  conn = mongoose.connect(MONGO_URL, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
-  })
-  .then(console.log("Connected to MongoDB"))
-  .catch((err) => console.log("NOT CONNECTED TO NETWORK", err));
+    serverSelectionTimeoutMS: 10000,
+  });
+  await conn;
+}
 
-app.use("/", Routes);
-
-app.listen(PORT, () => {
-  console.log(`Server started at port no. ${PORT}`);
+// Example route that ensures DB is connected
+app.post("/AdminLogin", async (req, res) => {
+  try {
+    await connectDB();
+    // TODO: replace with your real login logic (Admin model)
+    // const admin = await Admin.findOne({ email: req.body.email });
+    return res.json({ ok: true, message: "AdminLogin reached (test)" });
+  } catch (err) {
+    console.error("DBERR:", err.message || err);
+    return res.status(500).json({ error: "DB error" });
+  }
 });
+
+const handler = serverless(app);
+module.exports = handler;
