@@ -1,26 +1,29 @@
 const express = require("express");
-const cors = require("cors");
 const mongoose = require("mongoose");
 const dotenv = require("dotenv");
+const cors = require("cors");
+const bodyParser = require("body-parser");
 const serverless = require("serverless-http");
-
-const app = express();
-const Routes = require("./routes/route.js");
 
 dotenv.config();
 
-app.use(express.json({ limit: "10mb" }));
+const app = express();
 app.use(cors());
-app.use("/", Routes);
+app.use(bodyParser.json());
 
+// ✅ Routes import
+const routes = require("./routes");
+app.use("/api", routes);
+
+// ✅ MongoDB connect
 mongoose
-  .connect(process.env.MONGO_URL, {
+  .connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
-  .then(() => console.log("✅ Connected to MongoDB"))
-  .catch((err) => console.log("❌ MongoDB connection error:", err));
+  .then(() => console.log("MongoDB connected"))
+  .catch((err) => console.error(err));
 
-// ⚡ Export as serverless function
+// ✅ Export as serverless function
 module.exports = app;
 module.exports.handler = serverless(app);
